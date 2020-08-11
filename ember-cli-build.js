@@ -7,6 +7,9 @@ module.exports = function(defaults) {
     // Add options here
   });
 
+  app.import('node_modules/bootstrap/dist/css/bootstrap.min.css');
+  app.import('node_modules/bootstrap/dist/js/bootstrap.min.js');
+  
   // Use `app.import` to add additional libraries to the generated
   // output files.
   //

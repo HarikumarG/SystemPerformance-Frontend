@@ -7,4 +7,6 @@ export default class Router extends EmberRouter {
 }
 
 Router.map(function() {
+    this.route('mainpage',{path:'/'});
+    this.route('performance',{path:'/getsystemstats'});
 });

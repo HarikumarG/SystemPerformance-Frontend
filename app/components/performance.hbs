@@ -1,0 +1,35 @@
+<style>
+    .bottom {
+        margin-bottom: 0rem;
+    }
+    .adjust-width {
+        max-width: 700px;
+    }
+</style>
+<div class="container">
+    <div class="modal-dialog modal-dialog-centered adjust-width">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="form-group bottom">
+                    <h5 class="modal-title">System Stats</h5>
+                    <h6 class="form-text text-muted">Logged in as: {{ clientname }}</h6>
+                </div>
+            </div>
+            <div class="modal-body">
+                <ul class="list-unstyled">
+                    <li>The Stats will be updated for every 10 Seconds automatically</li>
+                    <li>The Stats contains load averages of CPU and RAM stats</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Get Stats</button>
+            </div>
+        </div>
+    </div>
+    <br>
+    <div class="row justify-content-center align-items-center">
+        <div id="cpustats_div" style="width: 700px; height: 350px;"></div>
+        <div id="memory_div" style="width: 700px; height: 350px;"></div>
+    </div>
+    <br>
+</div>
