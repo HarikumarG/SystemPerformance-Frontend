@@ -8,10 +8,16 @@ export default class PerformanceComponent extends Component {
     @service ('websockets') websockets;
 
     clientname = undefined;
-
+    dps1 = [];
+    dps5 = [];
+    dps15 = [];
+    dpsUsedRAM = [];
+    dpsUsedSwap = [];
+    chartCpu = undefined;
+    chartRAM = undefined;
+    chartSwap = undefined;
     constructor() {
         super(...arguments);
-        google.charts.load('current', {packages: ['corechart','table']});
         this.getName();
     }
     getName() {
@@ -27,6 +33,7 @@ export default class PerformanceComponent extends Component {
         const socket = this.websockets.socketFor('ws://localhost:8080/SystemPerformance-Backend/getStatsWebsocket');
         socket.on('open',() => {
             console.log("Connected to the server");
+            this.initializeGraph();
             let packet = {
                 type:"login",
                 name:this.clientname
@@ -40,7 +47,7 @@ export default class PerformanceComponent extends Component {
         socket.on('message',(data) => {
             let d = JSON.parse(data.data);
             console.log('From Websocket ',d);
-            this.chartHandler(d);
+            this.chartRender(d);
         });
     }
     sendData(conn,packet) {
@@ -60,63 +67,118 @@ export default class PerformanceComponent extends Component {
             })
         }).then((response) => {
             console.log('From Http ',response);
-            this.chartHandler(response);
         }).catch(function (error) {
             console.log(error);
         })
     }
-    chartHandler(response) {
-        this.clearChartDiv();
-        let cpustats = this.toChartData(response);
-        this.drawChart(cpustats);
+    initializeGraph() {
+        this.chartCpu = new CanvasJS.Chart("cpustats_div", {
+            animationEnabled: true,
+            exportEnabled: true,
+            title: {
+                text: "CPU Usage"
+            },
+            axisY: {
+		        title: "Load average value"
+	        },
+            axisX: {
+                title: "System Uptime (in seconds)"
+            },
+            toolTip: {
+                shared: "true"
+            },
+            data: [
+            {
+                type: "spline",
+                showInLegend: true,
+                markerSize: 0,
+                name: "Past 1 min",
+                dataPoints: this.dps1
+            },
+            {
+                type: "spline",
+                showInLegend: true,
+                markerSize: 0,
+                name: "Past 5 mins",
+                dataPoints: this.dps5
+            },
+            {
+                type: "spline",
+                showInLegend: true,
+                markerSize: 0,
+                name: "Past 15 mins",
+                dataPoints: this.dps15
+            }]
+        });
+        this.chartRAM = new CanvasJS.Chart("RAM_memory_div", {
+            animationEnabled: true,
+            exportEnabled: true,
+            title: {
+                text: "RAM Usage (Total RAM = 6126325760 bytes)"
+            },
+            axisY: {
+                title: "RAM Usage (in Bytes)"
+            },
+            axisX: {
+                title: "System Uptime (in seconds)"
+            },
+            data:[
+            {
+                type: "spline",
+                showInLegend: true,
+                markerSize: 0,
+                name: "Used RAM",
+                dataPoints: this.dpsUsedRAM
+            }]
+        });
+        this.chartSwap = new CanvasJS.Chart("Swap_memory_div", {
+            animationEnabled: true,
+            exportEnabled: true,
+            title: {
+                text: "Swap Usage (Total Swap space = 2147479552 bytes)"
+            },
+            axisY: {
+                title: "Swap Usage (in Bytes)"
+            },
+            axisX: {
+                title: "System Uptime (in seconds)"
+            },
+            data:[
+            {
+                type: "spline",
+                showInLegend: true,
+                markerSize: 0,
+                name: "Used Swap space",
+                dataPoints: this.dpsUsedSwap
+            }]
+        });
     }
-    clearChartDiv() {
-        $('#cpustats_div').empty();
-        $('#memory_div').empty();
+    chartRender(data) {
+        this.dps1.push({
+            x: data["uptime"],
+            y: data["loadavgpast1"]
+        });
+        this.dps5.push({
+            x: data["uptime"],
+            y: data["loadavgpast5"]
+        });
+        this.dps15.push({
+            x: data["uptime"],
+            y: data["loadavgpast15"]
+        })
+
+        this.dpsUsedRAM.push({
+            x: data["uptime"],
+            y: data["usedram"]
+        })
+
+        this.dpsUsedSwap.push({
+            x: data["uptime"],
+            y: data["usedswap"]
+        })
+        this.chartCpu.render();
+        this.chartRAM.render();
+        this.chartSwap.render();
     }
-    toChartData(response) {
-        let d = {
-            loadavgpast1:response["loadavgpast1"],
-            loadavgpast5:response["loadavgpast5"],
-            loadavgpast15:response["loadavgpast15"],
-            totalram:response["totalram"],
-            freeram:response["freeram"],
-            usedram:response["usedram"],
-            totalswap:response["totalswap"],
-            freeswap:response["freeswap"],
-            usedswap:response["usedswap"]
-        }
-        return d;
-    }
-    drawChart(data) {
-        var cpuval = this.cpu_div_arrayType(data);
-        var memval = this.memory_div_arrayType(data);
-        var chart1 = new google.visualization.LineChart(document.getElementById("cpustats_div"));
-        var chart2 = new google.visualization.BarChart(document.getElementById("memory_div"));
-        chart1.draw(cpuval[0],cpuval[1]);
-        chart2.draw(memval[0],memval[1]);
-    }
-    cpu_div_arrayType(data) {
-        var d = google.visualization.arrayToDataTable([
-            ['Time for the past','Load Average'],
-            ['1 minute',          data.loadavgpast1],
-            ['5 minutes',          data.loadavgpast5],
-            ['15 minutes',         data.loadavgpast15]
-        ]);
-        var options = {
-            title: 'CPU Load Average for the past 1 minute, 5 minutes, 15 minutes',
-            curveType: 'function',
-            legend: { position: 'bottom' }
-        };
-        return [d,options];        
-    }
-    memory_div_arrayType(data) {
-        var d = google.visualization.arrayToDataTable([
-            ['Type',      'Total',{ role: 'annotation'}, 'Free',{ role: 'annotation'}, 'Used',{ role: 'annotation'}],
-            ['RAM size',  data.totalram,"Total RAM",   data.freeram,"Free RAM",    data.usedram,"Used RAM"],
-            ['Swap space',   data.totalswap,"Total space",   data.freeswap,"Free space",    data.usedswap,"Used space"]
-        ]);
-        var options = {title: 'RAM size (in Bytes)\nSwap space (in Bytes)'};
-        return [d,options];        
-    }
+
 }
