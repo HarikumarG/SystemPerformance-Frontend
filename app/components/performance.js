@@ -2,183 +2,206 @@ import Component from '@glimmer/component';
 import { action } from '@ember/object';
 import { tracked } from '@glimmer/tracking';
 import jQuery from 'jquery';
-import {inject as service} from '@ember/service';
 
 export default class PerformanceComponent extends Component {
-    @service ('websockets') websockets;
-
     clientname = undefined;
-    dps1 = [];
-    dps5 = [];
-    dps15 = [];
+    dpsCpu = [];
     dpsUsedRAM = [];
-    dpsUsedSwap = [];
     chartCpu = undefined;
     chartRAM = undefined;
-    chartSwap = undefined;
-    constructor() {
-        super(...arguments);
-        this.getName();
-    }
+    fromTimestamp = "";
+    toTimestamp = "";
+    
+    // constructor() {
+    //     super(...arguments);
+    //     this.getName();
+    // }
     getName() {
         var name = prompt("Enter your name");
         if(name == null || name == "")
             this.getName();
         else {
             this.clientname = name;
-            this.initializeWebsocket();
         }
     }
-    initializeWebsocket() {
-        const socket = this.websockets.socketFor('ws://localhost:8080/SystemPerformance-Backend/getStatsWebsocket');
-        socket.on('open',() => {
-            console.log("Connected to the server");
-            this.initializeGraph();
-            let packet = {
-                type:"login",
-                name:this.clientname
-            }
-            this.sendData(socket,packet);
-        });
-        socket.on('close',() => {
-            console.log("Connection is closed");
-            socket.close();
-        });
-        socket.on('message',(data) => {
-            let d = JSON.parse(data.data);
-            console.log('From Websocket ',d);
-            this.chartRender(d);
-        });
-    }
-    sendData(conn,packet) {
-        conn.send(JSON.stringify(packet));
-    }
     @action onGetstats() {
-        this.getStatsReq();
+        var timestamp = $('input[name="daterange"]').val();
+        if(timestamp == '') {
+            alert("Select Date and Time");
+        } else {
+            var d = timestamp.split(" to ");
+            this.fromTimestamp = d[0];
+            this.toTimestamp = d[1];
+            this.getStatsReq();
+        }
     }
-    getStatsReq() {
+    onDatePicker(element) {
+        $('input[name="daterange"]').daterangepicker({
+            opens: 'right',
+            autoUpdateInput: false,
+            timePicker: true,
+            timePicker24Hour: true,
+            timePickerSeconds: true,
+            locale: {
+                format: 'YYYY-MM-DD HH:mm:ss'
+            }
+        });
+        
+        $('input[name="daterange"]').on('apply.daterangepicker',function(ev, picker) {
+            $(this).val(picker.startDate.format('YYYY-MM-DD HH:mm:ss') + ' to ' + picker.endDate.format('YYYY-MM-DD HH:mm:ss'));
+        });
+
+        $('input[name="daterange"]').on('cancel.daterangepicker',function(ev, picker) {
+            $(this).val('');
+        });
+    }
+    async getStatsReq() {
+        await this.initializeGraph();
         jQuery.ajax({
             url:"http://localhost:8080/SystemPerformance-Backend/getStatsHttp",
             type: "POST",
             contentType:"application/json; charset=utf-8",
             dataType:"json",
             data: JSON.stringify({
-                "name":this.clientname
+                "fromTimestamp": this.fromTimestamp,
+                "toTimestamp": this.toTimestamp
             })
         }).then((response) => {
-            console.log('From Http ',response);
+            for(var i in response) {
+                if(response[i]["timestamp"]) {
+                    this.chartRender(response[i]);
+                }
+            }
         }).catch(function (error) {
             console.log(error);
         })
     }
     initializeGraph() {
+        this.dpsCpu = [];
+        this.dpsUsedRAM = [];
         this.chartCpu = new CanvasJS.Chart("cpustats_div", {
-            animationEnabled: true,
-            exportEnabled: true,
-            title: {
-                text: "CPU Usage"
-            },
-            axisY: {
-		        title: "Load average value"
-	        },
-            axisX: {
-                title: "System Uptime (in seconds)"
+            theme: "light1",
+            title:{
+                text: "CPU Usage", 
+                fontWeight: "bolder",
+                fontColor: "#008B8B",
+                fontFamily: "tahoma",        
+                fontSize: 25,
+                padding: 10       
             },
             toolTip: {
-                shared: "true"
+                animationEnabled: true,
+                contentFormatter: function(e) {
+                    var content = "";
+                    var d = new Date(e.entries[0].dataPoint.x);
+                    var datetime = d.toLocaleString("en-IN",{ 
+                        hour12: false, 
+                        dateStyle: "medium",
+                        timeStyle: "medium"
+                    });
+                    content += datetime +" - <strong>"+e.entries[0].dataPoint.y+" %</strong>";
+                    return content;
+                }
             },
-            data: [
-            {
-                type: "spline",
-                showInLegend: true,
-                markerSize: 0,
-                name: "Past 1 min",
-                dataPoints: this.dps1
+            axisY: {
+		        title: "CPU Usage (in %)",
+                titleFontSize: 18,
+                margin: 10, 
+                titleFontWeight: "bold",
+                labelFontSize: 12,
+                suffix: " %",
+                interlacedColor: "Azure",
+                gridThickness: 1
+	        },
+            axisX: {
+                title: "Time Stamp (in 24-hr format)",
+                titleFontSize: 18,
+                margin: 10,
+                labelAngle: -50,
+                labelMaxWidth: 70,
+			    labelWrap: true,
+                labelFontSize: 12,
+                valueFormatString: "HH:mm",
+                titleFontWeight: "bold",
+                // interval: 1,
+                // intervalType: "hour"
             },
-            {
-                type: "spline",
-                showInLegend: true,
-                markerSize: 0,
-                name: "Past 5 mins",
-                dataPoints: this.dps5
-            },
-            {
-                type: "spline",
-                showInLegend: true,
-                markerSize: 0,
-                name: "Past 15 mins",
-                dataPoints: this.dps15
+            zoomEnabled: true,
+            data: [{
+                type: "splineArea",
+                name: "Usage Percentage",
+                dataPoints: this.dpsCpu,
+                markerType: "circle",
+                markerSize: 5
             }]
         });
         this.chartRAM = new CanvasJS.Chart("RAM_memory_div", {
-            animationEnabled: true,
-            exportEnabled: true,
-            title: {
-                text: "RAM Usage (Total RAM = 6126325760 bytes)"
+            theme: "light1",
+            title:{
+                text: "RAM Usage", 
+                fontWeight: "bolder",
+                fontColor: "#008B8B",
+                fontFamily: "tahoma",        
+                fontSize: 25,
+                padding: 10       
+            },
+            toolTip: {
+                animationEnabled: true,
+                contentFormatter: function(e) {
+                    var content = "";
+                    var d = new Date(e.entries[0].dataPoint.x);
+                    var datetime = d.toLocaleString("en-IN",{ 
+                        hour12: false,
+                        dateStyle: "medium",
+                        timeStyle: "medium"
+                    });
+                    content += datetime +" - <strong>"+e.entries[0].dataPoint.y+" GB</strong>";
+                    return content;
+                }
             },
             axisY: {
-                title: "RAM Usage (in Bytes)"
+                title: "RAM Usage (in GB)",
+                titleFontSize: 18,
+                margin: 10,
+                titleFontWeight: "bold",
+                labelFontSize: 12,
+                suffix: " GB",
+                interlacedColor: "Azure",
+                gridThickness: 1
             },
             axisX: {
-                title: "System Uptime (in seconds)"
+                title: "Time Stamp (in 24-hr format)",
+                titleFontSize: 18,
+                margin: 10,
+                labelAngle: -50,
+                labelMaxWidth: 70,
+			    labelWrap: true,
+                labelFontSize: 12,
+                valueFormatString: "HH:mm",
+                titleFontWeight: "bold"
             },
+            zoomEnabled: true,
             data:[
             {
-                type: "spline",
-                showInLegend: true,
-                markerSize: 0,
+                type: "splineArea",
                 name: "Used RAM",
-                dataPoints: this.dpsUsedRAM
-            }]
-        });
-        this.chartSwap = new CanvasJS.Chart("Swap_memory_div", {
-            animationEnabled: true,
-            exportEnabled: true,
-            title: {
-                text: "Swap Usage (Total Swap space = 2147479552 bytes)"
-            },
-            axisY: {
-                title: "Swap Usage (in Bytes)"
-            },
-            axisX: {
-                title: "System Uptime (in seconds)"
-            },
-            data:[
-            {
-                type: "spline",
-                showInLegend: true,
-                markerSize: 0,
-                name: "Used Swap space",
-                dataPoints: this.dpsUsedSwap
+                dataPoints: this.dpsUsedRAM,
+                markerType: "circle",
+                markerSize: 5
             }]
         });
     }
     chartRender(data) {
-        this.dps1.push({
-            x: data["uptime"],
-            y: data["loadavgpast1"]
-        });
-        this.dps5.push({
-            x: data["uptime"],
-            y: data["loadavgpast5"]
-        });
-        this.dps15.push({
-            x: data["uptime"],
-            y: data["loadavgpast15"]
+        this.dpsCpu.push({
+            x: new Date(data["timestamp"]),
+            y: data["cpuusage"]
         })
-
         this.dpsUsedRAM.push({
-            x: data["uptime"],
+            x: new Date(data["timestamp"]),
             y: data["usedram"]
-        })
-
-        this.dpsUsedSwap.push({
-            x: data["uptime"],
-            y: data["usedswap"]
         })
         this.chartCpu.render();
         this.chartRAM.render();
-        this.chartSwap.render();
     }
 
 }

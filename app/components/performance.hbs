@@ -16,27 +16,20 @@
                 </div>
             </div>
             <div class="modal-body">
-                <ul class="list-unstyled">
-                    <li>The Stats will be updated for every 10 Seconds automatically</li>
-                    <li>The Stats contains load averages of CPU and RAM stats</li>
-                </ul>
+                <input type="text" class="form-control" name="daterange" value = "" placeholder="Select Date and Time" {{did-insert this.onDatePicker}}/>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Get Stats</button>
+                <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Refresh</button>
             </div>
         </div>
     </div>
     <br>
     <div class="row justify-content-center align-items-center">
         <div id="cpustats_div" style="width: 100%; height: 350px;"></div>
-    </div>
+    </div>        
     <br>
     <div class="row justify-content-center align-items-center">
         <div id="RAM_memory_div" style="width: 100%; height: 350px;"></div>
-    </div>
-    <br>
-    <div class="row justify-content-center align-items-center">
-        <div id="Swap_memory_div" style="width: 100%; height: 350px;"></div>
     </div>
     <br>
 </div>
