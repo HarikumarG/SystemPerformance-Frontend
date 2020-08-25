@@ -1,32 +1,34 @@
-import Component from '@glimmer/component';
+import Component from '@ember/component';
 import { action } from '@ember/object';
 import { tracked } from '@glimmer/tracking';
 import jQuery from 'jquery';
 
 export default class PerformanceComponent extends Component {
-    clientname = undefined;
+    @tracked showSettings = false;
+    @tracked showAlertSetting = false;
+    @tracked sendNotify = false;
+    @tracked clientname = undefined;
     dpsCpu = [];
     dpsUsedRAM = [];
     chartCpu = undefined;
     chartRAM = undefined;
     fromTimestamp = "";
     toTimestamp = "";
-    
-    // constructor() {
-    //     super(...arguments);
-    //     this.getName();
-    // }
-    getName() {
-        var name = prompt("Enter your name");
-        if(name == null || name == "")
-            this.getName();
-        else {
-            this.clientname = name;
-        }
+    timeInterval = undefined;
+    timeIntervalRelative = undefined;
+    cpuUsage = "";
+    ramUsage = "";
+    didInsertElement() {
+        this.onDatePicker();
+        this.initializeGraph();
+        this.getName();
+        this.getSettingsStats();
     }
     @action onGetstats() {
         var timestamp = $('input[name="daterange"]').val();
         if(timestamp == '') {
+            document.getElementById("requesttimer").options.selectedIndex = 0;
+            this.stopTimeInterval();
             alert("Select Date and Time");
         } else {
             var d = timestamp.split(" to ");
@@ -35,28 +37,45 @@ export default class PerformanceComponent extends Component {
             this.getStatsReq();
         }
     }
-    onDatePicker(element) {
-        $('input[name="daterange"]').daterangepicker({
-            opens: 'right',
-            autoUpdateInput: false,
-            timePicker: true,
-            timePicker24Hour: true,
-            timePickerSeconds: true,
-            locale: {
-                format: 'YYYY-MM-DD HH:mm:ss'
-            }
-        });
-        
-        $('input[name="daterange"]').on('apply.daterangepicker',function(ev, picker) {
-            $(this).val(picker.startDate.format('YYYY-MM-DD HH:mm:ss') + ' to ' + picker.endDate.format('YYYY-MM-DD HH:mm:ss'));
-        });
-
-        $('input[name="daterange"]').on('cancel.daterangepicker',function(ev, picker) {
-            $(this).val('');
-        });
+    @action requestTimer(timer) {
+        var timeval = parseInt(timer);
+        console.log(timeval);
+        if(timeval == 0) {
+            this.stopTimeInterval();
+        } else {
+            this.stopTimeInterval();
+            this.startTimeInterval(timeval);
+        }
     }
-    async getStatsReq() {
-        await this.initializeGraph();
+    @action relativeTime(time) {
+        console.log("Relative time");
+        this.stopTimeIntervalRelative();
+        this.startTimeIntervalRelative(time);
+    }
+    @action onCustomRange() {
+        document.getElementById("relativetime").options.selectedIndex = 0;
+        this.relativeTime("0");
+    }
+    getName() {
+        var name = prompt("Enter your name");
+        if(name == null || name == "")
+            this.getName();
+        else {
+            this.clientname = name;
+        }
+    }
+    stopTimeInterval() {
+        if(this.timeInterval != undefined) {
+            clearInterval(this.timeInterval);
+            this.timeInterval = undefined;
+        }
+    }
+    startTimeInterval(timeval) {
+        this.timeInterval = setInterval(this.onGetstats,timeval);
+    }
+    getStatsReq() {
+        this.dpsCpu = [];
+        this.dpsUsedRAM = [];
         jQuery.ajax({
             url:"http://localhost:8080/SystemPerformance-Backend/getStatsHttp",
             type: "POST",
@@ -67,18 +86,18 @@ export default class PerformanceComponent extends Component {
                 "toTimestamp": this.toTimestamp
             })
         }).then((response) => {
+            console.log(response);
             for(var i in response) {
                 if(response[i]["timestamp"]) {
-                    this.chartRender(response[i]);
+                    this.chartDataBuild(response[i]);
                 }
             }
+            this.ChartRender();
         }).catch(function (error) {
             console.log(error);
-        })
+        });
     }
     initializeGraph() {
-        this.dpsCpu = [];
-        this.dpsUsedRAM = [];
         this.chartCpu = new CanvasJS.Chart("cpustats_div", {
             theme: "light1",
             title:{
@@ -130,7 +149,6 @@ export default class PerformanceComponent extends Component {
             data: [{
                 type: "splineArea",
                 name: "Usage Percentage",
-                dataPoints: this.dpsCpu,
                 markerType: "circle",
                 markerSize: 5
             }]
@@ -185,13 +203,12 @@ export default class PerformanceComponent extends Component {
             {
                 type: "splineArea",
                 name: "Used RAM",
-                dataPoints: this.dpsUsedRAM,
                 markerType: "circle",
                 markerSize: 5
             }]
         });
     }
-    chartRender(data) {
+    chartDataBuild(data) {
         this.dpsCpu.push({
             x: new Date(data["timestamp"]),
             y: data["cpuusage"]
@@ -200,8 +217,157 @@ export default class PerformanceComponent extends Component {
             x: new Date(data["timestamp"]),
             y: data["usedram"]
         })
+    }
+    ChartRender() {
+        this.chartCpu.options.data[0].dataPoints = this.dpsCpu;
+        this.chartRAM.options.data[0].dataPoints = this.dpsUsedRAM;
         this.chartCpu.render();
         this.chartRAM.render();
     }
 
+    onDatePicker(element) {
+        $('input[name="daterange"]').daterangepicker({
+            opens: 'right',
+            timePicker: true,
+            timePicker24Hour: true,
+            timePickerSeconds: true,
+            autoUpdateInput: false,
+            alwaysShowCalendars: true,
+            locale: {
+                format: 'YYYY-MM-DD HH:mm:ss'
+            }
+        });
+        $('input[name="daterange"]').on('apply.daterangepicker',function(ev, picker) {
+            $('input[name="daterange"]').val(picker.startDate.format('YYYY-MM-DD HH:mm:ss') + ' to ' + picker.endDate.format('YYYY-MM-DD HH:mm:ss'));
+        });
+        $('input[name="daterange"]').on('cancel.daterangepicker',function(ev, picker) {
+            $(this).val('');
+        });
+    }
+    stopTimeIntervalRelative() {
+        if(this.timeIntervalRelative != undefined) {
+            clearInterval(this.timeIntervalRelative);
+            this.timeIntervalRelative = undefined;
+        }
+    }
+    startTimeIntervalRelative(val) {
+        if(val == "0") {
+            $('input[name="daterange"]').val('');
+        }
+        else if(val == "5min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(5,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "15min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(15,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "30min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(30,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "today") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "yesterday") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(1, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().subtract(1, 'days').endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "7days") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(6, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "30days") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(29, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "currmonth") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().startOf('month').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('month').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "lastmonth") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        }
+    }
+
+    @action onSettings(){
+        this.showSettings = true;
+    }
+    @action onAlertToggle(value) {
+        this.sendNotify = value == false ? true : false;
+        this.showAlertSetting = this.sendNotify == true ? true : false;
+    }
+    @action onAlertSave() {
+        this.showSettings = false;
+        if((this.cpuUsage == "" && this.ramUsage == "") || !this.showAlertSetting)
+            this.sendAlertReq("false","-1","-1");
+        else if(this.cpuUsage == "")
+            this.sendAlertReq("true","-1",this.ramUsage);
+        else if(this.ramUsage == "")
+            this.sendAlertReq("true",this.cpuUsage,"-1");
+        else
+            this.sendAlertReq("true",this.cpuUsage,this.ramUsage);
+    }
+    @action onAlertClose() {
+        this.showSettings = false;
+    }
+    sendAlertReq(notify,CPU,RAM) {
+        jQuery.ajax({
+            url:"http://localhost:8080/SystemPerformance-Backend/alertUpdate",
+            type: "POST",
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            data: JSON.stringify({
+                "AlertNotify": notify,
+                "RAMUsage": RAM,
+                "CPUUsage": CPU
+            })
+        }).then((response) => {
+            console.log(response);
+        }).catch(function (error) {
+            console.log(error);
+        });
+    }
+    getSettingsStats() {
+        jQuery.ajax({
+            url:"http://localhost:8080/SystemPerformance-Backend/getAlertSetting",
+            type: "POST",
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            data: JSON.stringify({
+                "name":this.clientname
+            })
+        }).then((response) => {
+            this.updateSettings(response);
+        }).catch(function (error) {
+            console.log(error);
+        });
+    }
+    updateSettings(response) {
+        this.sendNotify = response["sendNotify"] == "false" ? false : true;
+        this.showAlertSetting = this.sendNotify == true ? true : false;
+        this.cpuUsage = response["cpuUsage"];
+        this.ramUsage = response["ramUsage"];
+    }
 }

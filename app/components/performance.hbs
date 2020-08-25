@@ -5,6 +5,12 @@
     .adjust-width {
         max-width: 700px;
     }
+    .ember-modal-dialog {
+        width: 500px;
+    }
+    .setting {
+        max-width: 190px;
+    }
 </style>
 <div class="container">
     <div class="modal-dialog modal-dialog-centered adjust-width">
@@ -16,9 +22,35 @@
                 </div>
             </div>
             <div class="modal-body">
-                <input type="text" class="form-control" name="daterange" value = "" placeholder="Select Date and Time" {{did-insert this.onDatePicker}}/>
+                <div class="form-group">
+                <input id="absolutetime" type="text" class="form-control" name="daterange" value = "" placeholder="Select Date and Time" {{action 'onCustomRange' on="click" }}/>
+                <br>
+                <select id="relativetime" onchange={{action "relativeTime" value="target.value"}} class="form-control" >
+                    <option disabled selected>Select Relative Time</option>
+                    <option value="0">Off</option>
+                    <option value="5min">Last 5 minutes </option>
+                    <option value="15min">Last 15 minutes</option>
+                    <option value="30min">Last 30 minutes</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="7days">Last 7 days</option>
+                    <option value="30days">Last 30 days</option>
+                    <option value="currmonth">This Month</option>
+                    <option value="lastmonth">Last Month</option>
+                </select>
+                </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-primary" {{action 'onSettings' on="click" }}>Settings</button>
+                <div class="form-group">
+                    <select id="requesttimer" onchange={{action "requestTimer" value="target.value"}} class="form-control btn-primary">
+                        <option disabled selected>Request Timer</option>
+                        <option value="0">Off</option>
+                        <option value="10000">10 seconds</option>
+                        <option value="15000">15 seconds</option>
+                        <option value="20000">20 seconds</option>
+                    </select>
+                </div>
                 <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Refresh</button>
             </div>
         </div>
@@ -33,3 +65,45 @@
     </div>
     <br>
 </div>
+{{#if showSettings}}
+    {{#modal-dialog
+        targetAttachment="center"
+        translucentOverlay=true
+    }}
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Settings</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 setting">
+                    <h6>Set Alert Notify</h6>
+                    </div>
+                    <div class="col-md-2 setting">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 setting">
+                    <XToggle
+                        @theme='light'
+                        @size='small'
+                        @value={{this.sendNotify}}
+                        @onToggle={{action "onAlertToggle" this.sendNotify}}
+                    />
+                    </div>
+                </div>
+                {{#if showAlertSetting}}
+                    <div class="input-group">
+                        {{input class="form-control" placeholder="CPU Usage Max threshold" value=cpuUsage}}
+                        {{input class="form-control" placeholder="RAM Usage Max threshold" value=ramUsage}}
+                    </div>
+                {{/if}}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" {{action 'onAlertClose' on="click" }}>Close</button>
+                <button type="button" class="btn btn-success" {{action 'onAlertSave' on="click" }}>Save Changes</button>
+            </div>
+        </div>
+    </div>
+    {{/modal-dialog}}
+{{/if}}
