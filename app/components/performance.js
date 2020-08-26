@@ -338,15 +338,34 @@ export default class PerformanceComponent extends Component {
         this.showAlertSetting = this.sendNotify == true ? true : false;
     }
     @action onAlertSave() {
-        this.showSettings = false;
-        if((this.cpuUsage == "" && this.ramUsage == "") || !this.showAlertSetting)
+        if((this.cpuUsage == "" && this.ramUsage == "") || !this.showAlertSetting) {
+            this.showSettings = false;
             this.sendAlertReq("false","-1","-1");
-        else if(this.cpuUsage == "")
-            this.sendAlertReq("true","-1",this.ramUsage);
-        else if(this.ramUsage == "")
-            this.sendAlertReq("true",this.cpuUsage,"-1");
-        else
-            this.sendAlertReq("true",this.cpuUsage,this.ramUsage);
+        }
+        else if(this.cpuUsage == "") {
+            if(parseFloat(this.ramUsage).toString() == this.ramUsage) {
+                this.showSettings = false;
+                this.sendAlertReq("true","-1",this.ramUsage);
+            }
+            else
+                this.toast.error('','RAM Usage should be decimal',this.toastOptions);
+        }
+        else if(this.ramUsage == "") {
+            if(parseInt(this.cpuUsage).toString() == this.cpuUsage) {
+                this.showSettings = false;
+                this.sendAlertReq("true",this.cpuUsage,"-1");
+            }
+            else
+                this.toast.error('','CPU Usage should be Integer',this.toastOptions);
+        }
+        else {
+            if(parseInt(this.cpuUsage).toString() == this.cpuUsage && parseFloat(this.ramUsage).toString() == this.ramUsage) {
+                this.showSettings = false;
+                this.sendAlertReq("true",this.cpuUsage,this.ramUsage);
+            }
+            else
+                this.toast.error('','CPU Usage and RAM Usage should be Integer and Decimal',this.toastOptions);
+        }
     }
     @action onAlertClose() {
         this.showSettings = false;
