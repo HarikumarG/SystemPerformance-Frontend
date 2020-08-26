@@ -1,6 +1,7 @@
 import Component from '@ember/component';
 import { action } from '@ember/object';
 import { tracked } from '@glimmer/tracking';
+import { inject as service } from '@ember/service';
 import jQuery from 'jquery';
 
 export default class PerformanceComponent extends Component {
@@ -8,6 +9,24 @@ export default class PerformanceComponent extends Component {
     @tracked showAlertSetting = false;
     @tracked sendNotify = false;
     @tracked clientname = undefined;
+    @service ('toast') toast;
+    toastOptions = {
+        closeButton: false,
+        debug: false,
+        newestOnTop: true,
+        progressBar: false,
+        positionClass: 'toast-top-right',
+        preventDuplicates: true,
+        onclick: null,
+        showDuration: '300',
+        hideDuration: '1000',
+        timeOut: '3000',
+        extendedTimeOut: '1000',
+        showEasing: 'swing',
+        hideEasing: 'linear',
+        showMethod: 'show',
+        hideMethod: 'hide'
+    }
     dpsCpu = [];
     dpsUsedRAM = [];
     chartCpu = undefined;
@@ -344,7 +363,10 @@ export default class PerformanceComponent extends Component {
                 "CPUUsage": CPU
             })
         }).then((response) => {
-            console.log(response);
+            if(response == "Alert Updated")
+                this.toast.success('','Saved',this.toastOptions);
+            else
+                this.toast.error('','Not Saved',this.toastOptions);
         }).catch(function (error) {
             console.log(error);
         });
@@ -369,5 +391,24 @@ export default class PerformanceComponent extends Component {
         this.showAlertSetting = this.sendNotify == true ? true : false;
         this.cpuUsage = response["cpuUsage"];
         this.ramUsage = response["ramUsage"];
+    }
+
+    @action onCheckLiveStats() {
+        jQuery.ajax({
+            url:"http://localhost:8080/SystemPerformance-Backend/checkLiveStats",
+            type: "POST",
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            data: JSON.stringify({
+                "name":this.clientname
+            })
+        }).then((response) => {
+            if(response == "true")
+                this.toast.success('','Connected',this.toastOptions);
+            else
+                this.toast.error('','Not Connected',this.toastOptions);
+        }).catch(function (error) {
+            console.log(error);
+        });
     }
 }

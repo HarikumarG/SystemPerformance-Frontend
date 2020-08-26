@@ -41,6 +41,7 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-primary" {{action 'onCheckLiveStats' on="click"}}>Check Live Stats</button>
                 <button type="button" class="btn btn-primary" {{action 'onSettings' on="click" }}>Settings</button>
                 <div class="form-group">
                     <select id="requesttimer" onchange={{action "requestTimer" value="target.value"}} class="form-control btn-primary">
