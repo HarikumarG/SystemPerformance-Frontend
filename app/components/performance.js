@@ -7,8 +7,27 @@ import jQuery from 'jquery';
 export default class PerformanceComponent extends Component {
     @tracked showSettings = false;
     @tracked showAlertSetting = false;
-    @tracked sendNotify = false;
-    @tracked clientname = undefined;
+    @tracked alertNotify = false;
+    @tracked machinelist = [];
+
+    @service ('employee-details') details;
+
+    @tracked userName = this.details.getEmpName();
+    @tracked userId = this.details.getEmpId();
+    password = this.details.getPassword();
+    systemName = "";
+
+    dpsCpu = [];
+    dpsUsedRAM = [];
+    chartCpu = undefined;
+    chartRAM = undefined;
+    fromTimestamp = "";
+    toTimestamp = "";
+    timeInterval = undefined;
+    timeIntervalRelative = undefined;
+    maxCpuUsage = "";
+    maxRamUsage = "";
+
     @service ('toast') toast;
     toastOptions = {
         closeButton: false,
@@ -27,20 +46,18 @@ export default class PerformanceComponent extends Component {
         showMethod: 'show',
         hideMethod: 'hide'
     }
-    dpsCpu = [];
-    dpsUsedRAM = [];
-    chartCpu = undefined;
-    chartRAM = undefined;
-    fromTimestamp = "";
-    toTimestamp = "";
-    timeInterval = undefined;
-    timeIntervalRelative = undefined;
-    cpuUsage = "";
-    ramUsage = "";
+
+
     didInsertElement() {
         this.onDatePicker();
         this.initializeGraph();
-        this.getName();
+        //this.getName();
+        this.getMachineList();
+    }
+
+
+    @action selectMachine(machine) {
+        this.systemName = machine;
         this.getSettingsStats();
     }
     @action onGetstats() {
@@ -48,17 +65,23 @@ export default class PerformanceComponent extends Component {
         if(timestamp == '') {
             document.getElementById("requesttimer").options.selectedIndex = 0;
             this.stopTimeInterval();
-            alert("Select Date and Time");
+            this.toast.error('',"Select Date and Time",this.toastOptions);
         } else {
             var d = timestamp.split(" to ");
             this.fromTimestamp = d[0];
             this.toTimestamp = d[1];
-            this.getStatsReq();
+            if(this.systemName == "") {
+                document.getElementById("requesttimer").options.selectedIndex = 0;
+                this.stopTimeInterval();
+                this.toast.error('',"Select a Machine",this.toastOptions);
+            }
+            else {
+                this.getStatsReq();
+            }
         }
     }
     @action requestTimer(timer) {
         var timeval = parseInt(timer);
-        console.log(timeval);
         if(timeval == 0) {
             this.stopTimeInterval();
         } else {
@@ -67,7 +90,6 @@ export default class PerformanceComponent extends Component {
         }
     }
     @action relativeTime(time) {
-        console.log("Relative time");
         this.stopTimeIntervalRelative();
         this.startTimeIntervalRelative(time);
     }
@@ -75,13 +97,41 @@ export default class PerformanceComponent extends Component {
         document.getElementById("relativetime").options.selectedIndex = 0;
         this.relativeTime("0");
     }
+
+
     getName() {
         var name = prompt("Enter your name");
         if(name == null || name == "")
             this.getName();
         else {
-            this.clientname = name;
+            this.userName = name;
         }
+    }
+    updateSettings(response) {
+        let alertConfig = response["Alert"];
+        this.alertNotify = alertConfig["ToggleNotify"] == "true" ? true : false;
+        this.showAlertSetting = this.alertNotify == true ? true : false;
+        this.maxCpuUsage = alertConfig["MaxCpuUsage"] == "NULL" ? "" : alertConfig["MaxCpuUsage"];
+        this.maxRamUsage = alertConfig["MaxRAMUsage"] == "NULL" ? "" : alertConfig["MaxRAMUsage"];
+    }
+    onDatePicker(element) {
+        $('input[name="daterange"]').daterangepicker({
+            opens: 'right',
+            timePicker: true,
+            timePicker24Hour: true,
+            timePickerSeconds: true,
+            autoUpdateInput: false,
+            alwaysShowCalendars: true,
+            locale: {
+                format: 'YYYY-MM-DD HH:mm:ss'
+            }
+        });
+        $('input[name="daterange"]').on('apply.daterangepicker',function(ev, picker) {
+            $('input[name="daterange"]').val(picker.startDate.format('YYYY-MM-DD HH:mm:ss') + ' to ' + picker.endDate.format('YYYY-MM-DD HH:mm:ss'));
+        });
+        $('input[name="daterange"]').on('cancel.daterangepicker',function(ev, picker) {
+            $(this).val('');
+        });
     }
     stopTimeInterval() {
         if(this.timeInterval != undefined) {
@@ -92,30 +142,74 @@ export default class PerformanceComponent extends Component {
     startTimeInterval(timeval) {
         this.timeInterval = setInterval(this.onGetstats,timeval);
     }
-    getStatsReq() {
-        this.dpsCpu = [];
-        this.dpsUsedRAM = [];
-        jQuery.ajax({
-            url:"http://localhost:8080/SystemPerformance-Backend/getStatsHttp",
-            type: "POST",
-            contentType:"application/json; charset=utf-8",
-            dataType:"json",
-            data: JSON.stringify({
-                "fromTimestamp": this.fromTimestamp,
-                "toTimestamp": this.toTimestamp
-            })
-        }).then((response) => {
-            console.log(response);
-            for(var i in response) {
-                if(response[i]["timestamp"]) {
-                    this.chartDataBuild(response[i]);
-                }
-            }
-            this.ChartRender();
-        }).catch(function (error) {
-            console.log(error);
-        });
+    stopTimeIntervalRelative() {
+        if(this.timeIntervalRelative != undefined) {
+            clearInterval(this.timeIntervalRelative);
+            this.timeIntervalRelative = undefined;
+        }
     }
+    startTimeIntervalRelative(val) {
+        if(val == "0") {
+            $('input[name="daterange"]').val('');
+        }
+        else if(val == "5min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(5,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "15min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(15,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "30min") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(30,"minutes").format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "today") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "yesterday") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(1, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().subtract(1, 'days').endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "7days") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(6, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "30days") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(29, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "currmonth") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().startOf('month').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().endOf('month').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        } else if(val == "lastmonth") {
+            this.timeIntervalRelative = setInterval(() => {
+                var from = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD HH:mm:ss');
+                var to = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD HH:mm:ss');
+                $('input[name="daterange"]').val(from + ' to ' + to);
+            },1000);
+        }
+    }
+
+
     initializeGraph() {
         this.chartCpu = new CanvasJS.Chart("cpustats_div", {
             theme: "light1",
@@ -161,8 +255,6 @@ export default class PerformanceComponent extends Component {
                 labelFontSize: 12,
                 valueFormatString: "HH:mm",
                 titleFontWeight: "bold",
-                // interval: 1,
-                // intervalType: "hour"
             },
             zoomEnabled: true,
             data: [{
@@ -244,160 +336,60 @@ export default class PerformanceComponent extends Component {
         this.chartRAM.render();
     }
 
-    onDatePicker(element) {
-        $('input[name="daterange"]').daterangepicker({
-            opens: 'right',
-            timePicker: true,
-            timePicker24Hour: true,
-            timePickerSeconds: true,
-            autoUpdateInput: false,
-            alwaysShowCalendars: true,
-            locale: {
-                format: 'YYYY-MM-DD HH:mm:ss'
-            }
-        });
-        $('input[name="daterange"]').on('apply.daterangepicker',function(ev, picker) {
-            $('input[name="daterange"]').val(picker.startDate.format('YYYY-MM-DD HH:mm:ss') + ' to ' + picker.endDate.format('YYYY-MM-DD HH:mm:ss'));
-        });
-        $('input[name="daterange"]').on('cancel.daterangepicker',function(ev, picker) {
-            $(this).val('');
-        });
-    }
-    stopTimeIntervalRelative() {
-        if(this.timeIntervalRelative != undefined) {
-            clearInterval(this.timeIntervalRelative);
-            this.timeIntervalRelative = undefined;
-        }
-    }
-    startTimeIntervalRelative(val) {
-        if(val == "0") {
-            $('input[name="daterange"]').val('');
-        }
-        else if(val == "5min") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(5,"minutes").format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "15min") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(15,"minutes").format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "30min") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(30,"minutes").format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "today") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().startOf('days').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "yesterday") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(1, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().subtract(1, 'days').endOf('days').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "7days") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(6, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "30days") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(29, 'days').startOf('days').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().endOf('days').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "currmonth") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().startOf('month').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().endOf('month').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        } else if(val == "lastmonth") {
-            this.timeIntervalRelative = setInterval(() => {
-                var from = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD HH:mm:ss');
-                var to = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD HH:mm:ss');
-                $('input[name="daterange"]').val(from + ' to ' + to);
-            },1000);
-        }
-    }
 
-    @action onSettings(){
-        this.showSettings = true;
-    }
-    @action onAlertToggle(value) {
-        this.sendNotify = value == false ? true : false;
-        this.showAlertSetting = this.sendNotify == true ? true : false;
-    }
-    @action onAlertSave() {
-        if((this.cpuUsage == "" && this.ramUsage == "") || !this.showAlertSetting) {
-            this.showSettings = false;
-            this.sendAlertReq("false","-1","-1");
-        }
-        else if(this.cpuUsage == "") {
-            if(parseFloat(this.ramUsage).toString() == this.ramUsage) {
-                this.showSettings = false;
-                this.sendAlertReq("true","-1",this.ramUsage);
-            }
-            else
-                this.toast.error('','RAM Usage should be decimal',this.toastOptions);
-        }
-        else if(this.ramUsage == "") {
-            if(parseInt(this.cpuUsage).toString() == this.cpuUsage) {
-                this.showSettings = false;
-                this.sendAlertReq("true",this.cpuUsage,"-1");
-            }
-            else
-                this.toast.error('','CPU Usage should be Integer',this.toastOptions);
-        }
-        else {
-            if(parseInt(this.cpuUsage).toString() == this.cpuUsage && parseFloat(this.ramUsage).toString() == this.ramUsage) {
-                this.showSettings = false;
-                this.sendAlertReq("true",this.cpuUsage,this.ramUsage);
-            }
-            else
-                this.toast.error('','CPU Usage and RAM Usage should be Integer and Decimal',this.toastOptions);
-        }
-    }
-    @action onAlertClose() {
-        this.showSettings = false;
-    }
-    sendAlertReq(notify,CPU,RAM) {
+    getMachineList() {
         jQuery.ajax({
-            url:"http://localhost:8080/SystemPerformance-Backend/alertUpdate",
+            url:"http://localhost:8080/SystemPerformance-Backend/getAllMachine",
             type: "POST",
             contentType:"application/json; charset=utf-8",
             dataType:"json",
             data: JSON.stringify({
-                "AlertNotify": notify,
-                "RAMUsage": RAM,
-                "CPUUsage": CPU
+                "EmpID": this.userId,
+                "EmpName": this.userName
             })
         }).then((response) => {
-            if(response == "Alert Updated")
-                this.toast.success('','Saved',this.toastOptions);
-            else
-                this.toast.error('','Not Saved',this.toastOptions);
+            for(var i in response) {
+                if(response[i]["systemname"]) {
+                    this.machinelist.pushObject({name:response[i]["systemname"]});
+                }
+            }
+        }).catch(function (error) {
+            console.log(error);
+        });
+    }
+    getStatsReq() {
+        this.dpsCpu = [];
+        this.dpsUsedRAM = [];
+        jQuery.ajax({
+            url:"http://localhost:8080/SystemPerformance-Backend/getStatsHttp",
+            type: "POST",
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            data: JSON.stringify({
+                "SystemName": this.systemName,
+                "fromTimestamp": this.fromTimestamp,
+                "toTimestamp": this.toTimestamp
+            })
+        }).then((response) => {
+            console.log(response);
+            for(var i in response) {
+                if(response[i]["timestamp"]) {
+                    this.chartDataBuild(response[i]);
+                }
+            }
+            this.ChartRender();
         }).catch(function (error) {
             console.log(error);
         });
     }
     getSettingsStats() {
         jQuery.ajax({
-            url:"http://localhost:8080/SystemPerformance-Backend/getAlertSetting",
+            url:"http://localhost:8080/SystemPerformance-Backend/getAllConfig",
             type: "POST",
             contentType:"application/json; charset=utf-8",
             dataType:"json",
             data: JSON.stringify({
-                "name":this.clientname
+                "SystemName":this.systemName
             })
         }).then((response) => {
             this.updateSettings(response);
@@ -405,27 +397,55 @@ export default class PerformanceComponent extends Component {
             console.log(error);
         });
     }
-    updateSettings(response) {
-        this.sendNotify = response["sendNotify"] == "false" ? false : true;
-        this.showAlertSetting = this.sendNotify == true ? true : false;
-        this.cpuUsage = response["cpuUsage"];
-        this.ramUsage = response["ramUsage"];
-    }
 
-    @action onCheckLiveStats() {
+
+    @action onSettings(){
+        if(this.systemName == "") {
+            this.toast.error('',"Select a Machine",this.toastOptions);
+        } else {
+            this.showSettings = true;
+        }
+    }
+    @action onAlertToggle(value) {
+        this.alertNotify = value == false ? true : false;
+        this.showAlertSetting = this.alertNotify == true ? true : false;
+    }
+    @action onSettingSave() {
+        if(!this.alertNotify) {
+            this.showSettings = false;
+            this.sendAlertReq("false","NULL","NULL");
+        }
+        else if(this.alertNotify){
+            if(this.maxCpuUsage != "" && this.maxRamUsage != "" && parseInt(this.maxCpuUsage).toString() == this.maxCpuUsage && parseFloat(this.maxRamUsage).toString() == this.maxRamUsage) {
+                this.showSettings = false;
+                this.sendAlertReq("true",this.maxCpuUsage,this.maxRamUsage);
+            }
+            else
+                this.toast.error('','CPU Usage and RAM Usage should be Integer and Decimal and Non Empty',this.toastOptions);
+        }
+    }
+    @action onSettingClose() {
+        this.showSettings = false;
+    }
+    sendAlertReq(notify,CPU,RAM) {
         jQuery.ajax({
-            url:"http://localhost:8080/SystemPerformance-Backend/checkLiveStats",
+            url:"http://localhost:8080/SystemPerformance-Backend/alertConfigUpdate",
             type: "POST",
             contentType:"application/json; charset=utf-8",
             dataType:"json",
             data: JSON.stringify({
-                "name":this.clientname
+                "EmpID": this.userId,
+                "Password": this.password,
+                "SystemName": this.systemName,
+                "AlertNotify": notify,
+                "MaxRAMUsage": RAM,
+                "MaxCPUUsage": CPU
             })
         }).then((response) => {
-            if(response == "true")
-                this.toast.success('','Connected',this.toastOptions);
+            if(response == "Alert Updated")
+                this.toast.success('','Saved',this.toastOptions);
             else
-                this.toast.error('','Not Connected',this.toastOptions);
+                this.toast.error('','Not Saved',this.toastOptions);
         }).catch(function (error) {
             console.log(error);
         });

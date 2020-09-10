@@ -1,6 +1,9 @@
 <style>
-    .bottom {
-        margin-bottom: 0rem;
+    .top-corner {
+        text-align: end;
+    }
+    .left-align {
+        padding-left: 0px;
     }
     .adjust-width {
         max-width: 700px;
@@ -16,9 +19,18 @@
     <div class="modal-dialog modal-dialog-centered adjust-width">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="form-group bottom">
+                <div class="col-sm-8 left-align">
                     <h5 class="modal-title">System Stats</h5>
-                    <h6 class="form-text text-muted">Logged in as: {{ clientname }}</h6>
+                    <select id="machinelist" onchange={{action "selectMachine" value="target.value"}} class="form-control">
+                        <option disabled selected>Select Machine</option>
+                        {{#each this.machinelist as |machine|}}
+                            <option value={{machine.name}}>{{machine.name}}</option>
+                        {{/each}}
+                    </select>
+                </div>
+                <div class="col-sm-4">
+                    <h6 class="form-text text-muted">Employee Name: {{ userName }}</h6>
+                    <h6 class="form-text text-muted">Employee ID: {{userId}}</h6>
                 </div>
             </div>
             <div class="modal-body">
@@ -41,18 +53,16 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" {{action 'onCheckLiveStats' on="click"}}>Check Live Stats</button>
                 <button type="button" class="btn btn-primary" {{action 'onSettings' on="click" }}>Settings</button>
                 <div class="form-group">
                     <select id="requesttimer" onchange={{action "requestTimer" value="target.value"}} class="form-control btn-primary">
                         <option disabled selected>Request Timer</option>
                         <option value="0">Off</option>
-                        <option value="10000">10 seconds</option>
-                        <option value="15000">15 seconds</option>
-                        <option value="20000">20 seconds</option>
+                        <option value="300000">5 minutes</option>
+                        <option value="600000">10 minutes</option>
                     </select>
                 </div>
-                <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Refresh</button>
+                <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Get Stored Data</button>
             </div>
         </div>
     </div>
@@ -88,21 +98,21 @@
                     <XToggle
                         @theme='light'
                         @size='small'
-                        @value={{this.sendNotify}}
-                        @onToggle={{action "onAlertToggle" this.sendNotify}}
+                        @value={{this.alertNotify}}
+                        @onToggle={{action "onAlertToggle" this.alertNotify}}
                     />
                     </div>
                 </div>
                 {{#if showAlertSetting}}
                     <div class="input-group">
-                        {{input class="form-control" placeholder="CPU Usage Max threshold" value=cpuUsage}}
-                        {{input class="form-control" placeholder="RAM Usage Max threshold" value=ramUsage}}
+                        {{input class="form-control" placeholder="CPU Usage Max threshold" value=maxCpuUsage}}
+                        {{input class="form-control" placeholder="RAM Usage Max threshold" value=maxRamUsage}}
                     </div>
                 {{/if}}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" {{action 'onAlertClose' on="click" }}>Close</button>
-                <button type="button" class="btn btn-success" {{action 'onAlertSave' on="click" }}>Save Changes</button>
+                <button type="button" class="btn btn-primary" {{action 'onSettingClose' on="click" }}>Close</button>
+                <button type="button" class="btn btn-success" {{action 'onSettingSave' on="click" }}>Save Changes</button>
             </div>
         </div>
     </div>
