@@ -1,7 +1,12 @@
 # system-performance-frontend
 
+This project displays the System's RAM Usage and CPU Usage as a chart view using Ember
+
+The Backend is developed using java
+
+https://github.com/HarikumarG/SystemPerformance-Backend.git (branch masterv1)
+
 This README outlines the details of collaborating on this Ember application.
-A short introduction of this app could easily go here.
 
 ## Prerequisites
 
