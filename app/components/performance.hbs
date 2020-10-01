@@ -14,6 +14,12 @@
     .setting {
         max-width: 190px;
     }
+    .live-modal {
+        width: 600px;
+    }
+    .live-size {
+        max-width: 300px;
+    }
 </style>
 <div class="container">
     <div class="modal-dialog modal-dialog-centered adjust-width">
@@ -63,6 +69,7 @@
                     </select>
                 </div>
                 <button type="button" class="btn btn-primary" {{action 'onGetstats' on="click" }}>Get Stored Data</button>
+                <button type="button" class="btn btn-primary" {{action 'onGetlivestats' on="click"}}>Get Live Data</button>
             </div>
         </div>
     </div>
@@ -113,6 +120,81 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" {{action 'onSettingClose' on="click" }}>Close</button>
                 <button type="button" class="btn btn-success" {{action 'onSettingSave' on="click" }}>Save Changes</button>
+            </div>
+        </div>
+    </div>
+    {{/modal-dialog}}
+{{/if}}
+{{#if showLivestats}}
+    {{#modal-dialog
+        targetAttachment="center"
+        translucentOverlay=true
+        containerClass="live-modal"
+    }}
+    <div class="modal-dialog adjust-width">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Live Stats</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 live-size">
+                    <h6>System Name</h6>
+                    </div>
+                    <div class="col-md-2 live-size">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 live-size">
+                        <span class="form-text">{{systemName}}</span>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 live-size">
+                    <h6>Time (yyyy-MM-dd HH:mm:ss)</h6>
+                    </div>
+                    <div class="col-md-2 live-size">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 live-size">
+                        <span class="form-text">{{livetimestamp}}</span>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 live-size">
+                    <h6>Total RAM (in GB)</h6>
+                    </div>
+                    <div class="col-md-2 live-size">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 live-size">
+                        <span class="form-text">{{livetotalram}}</span>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 live-size">
+                    <h6>Used RAM (in GB)</h6>
+                    </div>
+                    <div class="col-md-2 live-size">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 live-size">
+                        <span class="form-text">{{liveusedram}}</span>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 live-size">
+                    <h6>CPU Usage (in %)</h6>
+                    </div>
+                    <div class="col-md-2 live-size">
+                        <h6>:</h6>
+                    </div>
+                    <div class="col-md-4 live-size">
+                        <span class="form-text">{{livecpuusage}}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" {{action 'onLiveStatsClose' on="click" }}>Close</button>
             </div>
         </div>
     </div>

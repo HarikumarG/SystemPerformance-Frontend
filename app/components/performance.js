@@ -9,6 +9,7 @@ export default class PerformanceComponent extends Component {
     @tracked showAlertSetting = false;
     @tracked alertNotify = false;
     @tracked machinelist = [];
+    @tracked showLivestats = false;
 
     @service ('employee-details') details;
 
@@ -27,6 +28,10 @@ export default class PerformanceComponent extends Component {
     timeIntervalRelative = undefined;
     maxCpuUsage = "";
     maxRamUsage = "";
+    @tracked livetimestamp = "NULL";
+    @tracked livetotalram = "NULL";
+    @tracked liveusedram = "NULL";
+    @tracked livecpuusage = "NULL";
 
     @service ('toast') toast;
     toastOptions = {
@@ -51,7 +56,6 @@ export default class PerformanceComponent extends Component {
     didInsertElement() {
         this.onDatePicker();
         this.initializeGraph();
-        //this.getName();
         this.getMachineList();
     }
 
@@ -382,6 +386,32 @@ export default class PerformanceComponent extends Component {
             console.log(error);
         });
     }
+    getLiveStatsReq() {
+        this.dpsCpu = [];
+        this.dpsUsedRAM = [];
+        jQuery.ajax({
+            url:"http://localhost:8080/SystemPerformance-Backend/getLiveStats",
+            type: "POST",
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            data: JSON.stringify({
+                "SystemName": this.systemName
+            })
+        }).then((response) => {
+            console.log(response);
+            for(var i in response) {
+                if(response[i]["timestamp"]) {
+                    this.livetimestamp = response[i]["timestamp"];
+                    this.livetotalram = response[i]["totalram"];
+                    this.liveusedram = response[i]["usedram"];
+                    this.livecpuusage = response[i]["cpuusage"];
+                }
+            }
+            this.ChartRender();
+        }).catch(function (error) {
+            console.log(error);
+        });
+    }
     getSettingsStats() {
         jQuery.ajax({
             url:"http://localhost:8080/SystemPerformance-Backend/getAllConfig",
@@ -449,5 +479,25 @@ export default class PerformanceComponent extends Component {
         }).catch(function (error) {
             console.log(error);
         });
+    }
+
+    @action onGetlivestats() {
+        this.livetimestamp = "NULL";
+        this.livetotalram = "NULL";
+        this.liveusedram = "NULL";
+        this.livecpuusage = "NULL";
+        document.getElementById("relativetime").options.selectedIndex = 0;
+        this.relativeTime("0");
+        document.getElementById("requesttimer").options.selectedIndex = 0;
+        this.stopTimeInterval();
+        if(this.systemName == "") {
+            this.toast.error('',"Select a Machine",this.toastOptions);
+        } else {
+            this.getLiveStatsReq();
+            this.showLivestats = true;
+        }
+    }
+    @action onLiveStatsClose() {
+        this.showLivestats = false;
     }
 }
